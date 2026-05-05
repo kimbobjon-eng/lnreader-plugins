@@ -10,7 +10,7 @@ export const BoTiTranslation: Plugin.PluginBase = {
   name: "BOTI Translation",
   icon: "https://botitranslation.com/favicon.ico",
   site: BASE_URL,
-  version: "1.0.3",
+  version: "1.0.4",
   filters: undefined,
 
   async popularNovels(
@@ -105,7 +105,7 @@ export const BoTiTranslation: Plugin.PluginBase = {
 
     const result = await fetchApi(url);
     const json = await result.json() as any;
-    const items = json?.data?.list || [];
+    const items = json?.data?.list || json?.data?.records || [];
 
     return items.map((item: any) => ({
       name: item.title || "Unknown",
