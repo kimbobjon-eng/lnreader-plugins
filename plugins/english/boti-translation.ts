@@ -10,7 +10,7 @@ export const BoTiTranslation: Plugin.PluginBase = {
   name: "BOTI Translation",
   icon: "https://botitranslation.com/favicon.ico",
   site: BASE_URL,
-  version: "1.0.2",
+  version: "1.0.3",
   filters: undefined,
 
   async popularNovels(
@@ -101,7 +101,7 @@ export const BoTiTranslation: Plugin.PluginBase = {
   },
 
   async searchNovels(searchTerm: string, pageNo: number): Promise<Plugin.NovelItem[]> {
-    const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=20&title=${encodeURIComponent(searchTerm)}&sortDirection=DESC&sortField=readCounts`;
+   const url = `${API_URL}/content/books/search?keyWord=${encodeURIComponent(searchTerm)}&pageNumber=${pageNo}&pageSize=50`;
 
     const result = await fetchApi(url);
     const json = await result.json() as any;
