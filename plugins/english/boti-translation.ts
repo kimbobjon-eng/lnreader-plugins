@@ -9,14 +9,14 @@ class BoTiTranslation implements Plugin.PluginBase {
   name = 'BOTI Translation';
   icon = 'https://botitranslation.com/favicon.ico';
   site = 'https://botitranslation.com';
-  version = '1.0.7';
+  version = '1.0.8';
 
   async popularNovels(
     pageNo: number,
     { showLatestNovels }: Plugin.PopularNovelsOptions,
   ): Promise<Plugin.NovelItem[]> {
     const sortField = showLatestNovels ? 'lastUpdateTime' : 'readCounts';
-    const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=20&sortField=${sortField}&sortDirection=DESC`;
+    const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=20&sortField=${sortField}&sortDirection=DESC&type=translation`;
     const result = await fetchApi(url);
     const json = await result.json();
     const items = json?.data?.list || [];
