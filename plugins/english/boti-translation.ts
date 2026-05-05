@@ -9,7 +9,7 @@ class BoTiTranslation implements Plugin.PluginBase {
   name = 'BOTI Translation';
   icon = 'https://botitranslation.com/favicon.ico';
   site = 'https://botitranslation.com';
-  version = '1.0.9';
+  version = '1.0.10';
 
   async popularNovels(
     pageNo: number,
@@ -89,20 +89,27 @@ class BoTiTranslation implements Plugin.PluginBase {
     return content;
   }
 
-  async searchNovels(
-    searchTerm: string,
-    pageNo: number,
-  ): Promise<Plugin.NovelItem[]> {
-    const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=50&type=translation&title=${encodeURIComponent(searchTerm)}&sortField=lastUpdateTime&sortDirection=DESC`;
-    const result = await fetchApi(url);
-    const json = await result.json();
-    const items = json?.data?.list || [];
-    return items.map((item: any) => ({
+async searchNovels(
+  searchTerm: string,
+  pageNo: number,
+): Promise<Plugin.NovelItem[]> {
+
+  const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=50&type=translation&sortField=lastUpdateTime&sortDirection=DESC`;
+
+  const result = await fetchApi(url);
+  const json = await result.json();
+  const items = json?.data?.list || [];
+
+  return items
+    .filter((item: any) =>
+      item.title?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .map((item: any) => ({
       name: item.title || 'Unknown',
       cover: item.coverImgUrl || '',
       path: `/book/${item.id}`,
     }));
-  }
+}
 }
 
 export default new BoTiTranslation();
