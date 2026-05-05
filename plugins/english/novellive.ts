@@ -10,25 +10,25 @@ class NovelLive implements Plugin.PluginBase {
   name = 'Novel Live';
   icon = 'https://novellive.app/images/favicon.ico';
   site = BASE_URL;
-  version = '1.0.0';
+  version = '1.0.1';
 
   async popularNovels(
     pageNo: number,
     { showLatestNovels }: Plugin.PopularNovelsOptions,
   ): Promise<Plugin.NovelItem[]> {
     const listType = showLatestNovels ? 'latest-release-novels' : 'most-popular-novels';
-    const url = `${BASE_URL}/list/${listType}/${pageNo > 1 ? pageNo + '/' : ''}`;
+    const url = `${BASE_URL}/list/${listType}/${pageNo}/`;
     const result = await fetchApi(url);
     const body = await result.text();
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
 
-    $('ul.ul-list1 li, ul.ul-list4 li').each((_, el) => {
-      const anchor = $(el).find('a.con, h3.tit a').first();
+    $('div.ul-list1 div.li-row div.li').each((_, el) => {
+      const anchor = $(el).find('h3.tit a').first();
       const name = anchor.attr('title') || anchor.text().trim();
       const href = anchor.attr('href') || '';
       const path = href.replace(BASE_URL, '');
-      const cover = $(el).find('img').attr('src') || '';
+      const cover = $(el).find('div.pic img').attr('src') || '';
       if (name && path) novels.push({ name, cover, path });
     });
 
@@ -43,23 +43,21 @@ class NovelLive implements Plugin.PluginBase {
 
     const novel: Plugin.SourceNovel = {
       path: novelPath,
-      name: $('h1.tit').first().text().trim() || $('h3.tit span + *').first().text().trim(),
-      cover: $('div.pic img').first().attr('src') || `https://media.novellive.app/novel/${novelPath.replace('/book/', '')}.jpg`,
-      summary: $('div.txt div.inner').text().trim(),
-      author: $('div.item a[href*="/author/"]').first().text().trim(),
-      genres: $('div.item a[href*="/genres/"]').map((_, el) => $(el).text().trim()).get().join(', '),
-      status: $('span.s2 a[href*="latest-release"]').length ? NovelStatus.Ongoing : NovelStatus.Completed,
+      name: $('div.m-desc h1.tit').first().text().trim(),
+      cover: $('div.m-book1 div.pic img').first().attr('src') || '',
+      summary: $('div.m-desc div.txt div.inner').text().trim(),
+      author: $('div.m-imgtxt div.item a[href*="/author/"]').first().text().trim(),
+      genres: $('div.m-imgtxt div.item a[href*="/genres/"]').map((_, el) => $(el).text().trim()).get().join(', '),
+      status: NovelStatus.Ongoing,
       chapters: [],
     };
 
-    // Get total pages from pagination
-    const lastPageHref = $('a.index-container-btn').last().attr('href') || '';
+    const lastPageHref = $('div.m-newest2 div.page a.index-container-btn').last().attr('href') || '';
     const lastPageMatch = lastPageHref.match(/\/(\d+)\/?$/);
     const totalPages = lastPageMatch ? parseInt(lastPageMatch[1]) : 1;
 
     const chapters: Plugin.ChapterItem[] = [];
 
-    // Fetch all pages
     for (let page = 1; page <= totalPages; page++) {
       const pageUrl = page === 1 ? url : `${BASE_URL}${novelPath}/${page}`;
       const pageResult = await fetchApi(pageUrl);
@@ -90,12 +88,10 @@ class NovelLive implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
-    // Remove ads
     $('div[id^="pf-"]').remove();
     $('script').remove();
 
-    const content = $('div.txt').html() || '';
-    return content;
+    return $('div.txt').html() || '';
   }
 
   async searchNovels(
@@ -111,12 +107,12 @@ class NovelLive implements Plugin.PluginBase {
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
 
-    $('ul.ul-list1 li, div.m-book-item, li').each((_, el) => {
-      const anchor = $(el).find('a.con, h3.tit a').first();
+    $('div.ul-list1 div.li-row div.li, div.li-row div.li').each((_, el) => {
+      const anchor = $(el).find('h3.tit a').first();
       const name = anchor.attr('title') || anchor.text().trim();
       const href = anchor.attr('href') || '';
       const path = href.replace(BASE_URL, '');
-      const cover = $(el).find('img').attr('src') || '';
+      const cover = $(el).find('div.pic img').attr('src') || '';
       if (name && path && path.startsWith('/book/')) {
         novels.push({ name, cover, path });
       }
