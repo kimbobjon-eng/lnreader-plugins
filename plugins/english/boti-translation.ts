@@ -3,13 +3,18 @@ import { Plugin } from '@/types/plugin';
 import { NovelStatus } from '@libs/novelStatus';
 
 const API_URL = 'https://api.mystorywave.com/story-wave-backend/api/v1';
+const HEADERS = {
+  'Lang': 'en_US',
+  'Site-Domain': 'botitranslation.com',
+  'Origin': 'https://botitranslation.com',
+};
 
 class BoTiTranslation implements Plugin.PluginBase {
   id = 'botitranslation';
   name = 'BOTI Translation';
   icon = 'https://botitranslation.com/favicon.ico';
   site = 'https://botitranslation.com';
-  version = '1.0.10';
+  version = '1.1.0';
 
   async popularNovels(
     pageNo: number,
@@ -17,7 +22,7 @@ class BoTiTranslation implements Plugin.PluginBase {
   ): Promise<Plugin.NovelItem[]> {
     const sortField = showLatestNovels ? 'lastUpdateTime' : 'readCounts';
     const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=20&sortField=${sortField}&sortDirection=DESC&type=translation`;
-    const result = await fetchApi(url);
+    const result = await fetchApi(url, { headers: HEADERS });
     const json = await result.json();
     const items = json?.data?.list || [];
     return items.map((item: any) => ({
@@ -30,7 +35,7 @@ class BoTiTranslation implements Plugin.PluginBase {
   async parseNovel(novelPath: string): Promise<Plugin.SourceNovel> {
     const idMatch = novelPath.match(/\/book\/(\d+)/);
     const bookId = idMatch ? idMatch[1] : '';
-    const result = await fetchApi(`${API_URL}/content/books/${bookId}`);
+    const result = await fetchApi(`${API_URL}/content/books/${bookId}`, { headers: HEADERS });
     const json = await result.json();
     const book = json?.data || {};
     const novel: Plugin.SourceNovel = {
@@ -49,6 +54,7 @@ class BoTiTranslation implements Plugin.PluginBase {
     while (hasMore) {
       const chapResult = await fetchApi(
         `${API_URL}/content/chapters/page?sortDirection=ASC&bookId=${bookId}&pageNumber=${pageNumber}&pageSize=100`,
+        { headers: HEADERS },
       );
       const chapJson = await chapResult.json();
       const records = chapJson?.data?.list || [];
@@ -75,6 +81,7 @@ class BoTiTranslation implements Plugin.PluginBase {
     const chapterId = idMatch ? idMatch[1] : '';
     const result = await fetchApi(
       `${API_URL}/content/chapters/${chapterId}`,
+      { headers: HEADERS },
     );
     const json = await result.json();
     const chap = json?.data || {};
@@ -89,27 +96,20 @@ class BoTiTranslation implements Plugin.PluginBase {
     return content;
   }
 
-async searchNovels(
-  searchTerm: string,
-  pageNo: number,
-): Promise<Plugin.NovelItem[]> {
-
-  const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=50&type=translation&sortField=lastUpdateTime&sortDirection=DESC`;
-
-  const result = await fetchApi(url);
-  const json = await result.json();
-  const items = json?.data?.list || [];
-
-  return items
-    .filter((item: any) =>
-      item.title?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .map((item: any) => ({
+  async searchNovels(
+    searchTerm: string,
+    pageNo: number,
+  ): Promise<Plugin.NovelItem[]> {
+    const url = `${API_URL}/content/books?pageNumber=${pageNo}&pageSize=50&type=translation&sortField=lastUpdateTime&sortDirection=DESC&keyWord=${encodeURIComponent(searchTerm)}`;
+    const result = await fetchApi(url, { headers: HEADERS });
+    const json = await result.json();
+    const items = json?.data?.list || [];
+    return items.map((item: any) => ({
       name: item.title || 'Unknown',
       cover: item.coverImgUrl || '',
       path: `/book/${item.id}`,
     }));
-}
+  }
 }
 
 export default new BoTiTranslation();
