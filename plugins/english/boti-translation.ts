@@ -9,7 +9,7 @@ class BoTiTranslation implements Plugin.PluginBase {
   name = 'BOTI Translation';
   icon = 'https://botitranslation.com/favicon.ico';
   site = 'https://botitranslation.com';
-  version = '1.0.5';
+  version = '1.0.6';
 
   async popularNovels(
     pageNo: number,
@@ -104,7 +104,7 @@ class BoTiTranslation implements Plugin.PluginBase {
     searchTerm: string,
     pageNo: number,
   ): Promise<Plugin.NovelItem[]> {
-    const url = `${API_URL}/content/books/search?keyWord=${encodeURIComponent(searchTerm)}&pageNumber=${pageNo}&pageSize=50`;
+    const url = `${API_URL}/content/books/search?keyWord=${searchTerm.split(' ').join('+')}&pageNumber=${pageNo}&pageSize=50`;
     const result = await fetchApi(url);
     const json = await result.json();
     const items = json?.data?.list || [];
