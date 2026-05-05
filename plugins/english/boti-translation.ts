@@ -131,5 +131,3 @@ function slugify(text: string): string {
 }
 
 export default BoTiTranslation;
-
-
