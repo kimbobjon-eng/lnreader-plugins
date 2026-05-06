@@ -10,7 +10,7 @@ class NoBadNovel implements Plugin.PluginBase {
   name = 'NoBadNovel';
   icon = 'https://www.nobadnovel.com/nobad.svg';
   site = BASE_URL;
-  version = '1.0.1';
+  version = '1.0.2';
 
   async popularNovels(
     pageNo: number,
@@ -30,7 +30,6 @@ class NoBadNovel implements Plugin.PluginBase {
     $('a[href*="/series/"]').each((_, el) => {
       const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
-      // Series root = /series/slug (exactly 2 segments), not a chapter link
       const segments = path.split('/').filter(Boolean);
       if (segments.length !== 2) return;
       if (seen.has(path)) return;
@@ -84,13 +83,10 @@ class NoBadNovel implements Plugin.PluginBase {
     const chapters: Plugin.ChapterItem[] = [];
     const seen = new Set<string>();
 
-    // Chapters are in an ordered list: ol > li > a
-    // href pattern: /series/<novel-slug>/chapter-<n>-<title>
     $('ol li a, ul li a').each((_, el) => {
       const href = $(el).attr('href') || '';
       if (!href.includes('/series/')) return;
       const path = href.replace(BASE_URL, '');
-      // Must have 3 segments: /series/novel-slug/chapter-slug
       const segments = path.split('/').filter(Boolean);
       if (segments.length !== 3) return;
       if (seen.has(path)) return;
@@ -102,7 +98,7 @@ class NoBadNovel implements Plugin.PluginBase {
         `Chapter ${chapters.length + 1}`;
 
       chapters.push({
-        name: name.replace(/^C\d+\.\s*/, '').trim(), // strip "C1. " prefix if present
+        name: name.replace(/^C\d+\.\s*/, '').trim(),
         path,
         chapterNumber: chapters.length + 1,
       });
@@ -118,29 +114,31 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
+    // Remove all non-content elements first
     $(
       'script, style, noscript, iframe, nav, header, footer, ' +
       '.chapter-nav, [class*="navigation"], [class*="pager"], ' +
       '[class*="ads"], [id*="ads"], [class*="ad-"], [id*="ad-"]',
     ).remove();
 
-    const selectors = [
-      '.chapter-content',
-      '.entry-content',
-      '[class*="chapter-body"]',
-      '[class*="reading-content"]',
-      'article .content',
-      'article',
-    ];
+    // The site wraps chapter text in <p> tags directly inside the main content.
+    // Collect all <p> tags that contain meaningful text, skipping nav/meta paragraphs.
+    // We look for the largest contiguous block of <p> tags on the page.
+    const paragraphs: string[] = [];
 
-    for (const sel of selectors) {
-      const el = $(sel).first();
-      if (el.length && el.text().trim().length > 100) {
-        return el.html() || '';
-      }
+    $('p').each((_, el) => {
+      const text = $(el).text().trim();
+      // Skip short/empty paragraphs (nav labels, breadcrumbs, etc.)
+      if (text.length < 2) return;
+      paragraphs.push(`<p>${$(el).html()}</p>`);
+    });
+
+    if (paragraphs.length > 0) {
+      return paragraphs.join('\n');
     }
 
-    return '';
+    // Fallback: return whatever main/article contains
+    return $('main, article, #content, .content').first().html() || '';
   }
 
   async searchNovels(
