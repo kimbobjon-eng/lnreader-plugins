@@ -10,7 +10,7 @@ class NovelLive implements Plugin.PluginBase {
   name = 'Novel Live';
   icon = 'https://novellive.app/images/favicon.ico';
   site = BASE_URL;
-  version = '1.0.1';
+  version = '1.0.2';
 
   async popularNovels(
     pageNo: number,
@@ -84,7 +84,7 @@ class NovelLive implements Plugin.PluginBase {
 
   async parseChapter(chapterPath: string): Promise<string> {
     const url = `${BASE_URL}${chapterPath}`;
-    const result = await fetchApi(url);
+    const result = await fetchApi(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36', 'Referer': 'https://novellive.app/' } });
     const body = await result.text();
     const $ = parseHTML(body);
 
