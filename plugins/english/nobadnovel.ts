@@ -10,7 +10,7 @@ class NoBadNovel implements Plugin.PluginBase {
   name = 'NoBadNovel';
   icon = 'https://www.nobadnovel.com/nobad.svg';
   site = BASE_URL;
-  version = '1.0.0';
+  version = '1.0.1';
 
   async popularNovels(
     pageNo: number,
@@ -25,25 +25,25 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
+    const seen = new Set<string>();
 
-    // Each novel card — site uses article tags or generic div wrappers
-    $('article, .grid > div, .novel-item').each((_, el) => {
-      const anchor = $(el).find('a[href*="/series/"]').first();
-      const href = anchor.attr('href') || '';
+    $('a[href*="/series/"]').each((_, el) => {
+      const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
-      // Skip if this is a chapter link (too many path segments)
-      if (!path || path.split('/').filter(Boolean).length !== 2) return;
+      // Series root = /series/slug (exactly 2 segments), not a chapter link
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length !== 2) return;
+      if (seen.has(path)) return;
+      seen.add(path);
 
       const name =
+        $(el).attr('title') ||
         $(el).find('h2, h3, .entry-title').first().text().trim() ||
-        anchor.attr('title') ||
-        anchor.text().trim();
-      const cover =
-        $(el).find('img').first().attr('src') ||
-        $(el).find('img').first().attr('data-src') ||
-        '';
+        $(el).text().trim();
+      const imgEl = $(el).find('img').first();
+      const cover = imgEl.attr('src') || imgEl.attr('data-src') || '';
 
-      if (name && path) novels.push({ name, cover, path });
+      if (name) novels.push({ name, cover, path });
     });
 
     return novels;
@@ -63,7 +63,7 @@ class NoBadNovel implements Plugin.PluginBase {
         '',
       cover:
         $('meta[property="og:image"]').attr('content') ||
-        $('img.attachment-post-thumbnail, .series-cover img').first().attr('src') ||
+        $('img').first().attr('src') ||
         '',
       summary:
         $('meta[name="description"]').attr('content') ||
@@ -72,9 +72,7 @@ class NoBadNovel implements Plugin.PluginBase {
           .text()
           .trim() ||
         '',
-      author:
-        $('a[href*="/author/"]').first().text().trim() ||
-        $('[class*="author"]').first().text().replace(/author[:\s]*/i, '').trim(),
+      author: $('a[href*="/author/"]').first().text().trim(),
       genres: $('a[href*="/genre/"], a[href*="/genres/"], a[href*="/tag/"]')
         .map((_, el) => $(el).text().trim())
         .get()
@@ -83,28 +81,29 @@ class NoBadNovel implements Plugin.PluginBase {
       chapters: [],
     };
 
-    // Status detection
-    const statusText = $('[class*="status"]').first().text().toLowerCase();
-    if (statusText.includes('complet')) novel.status = NovelStatus.Completed;
-
-    // Collect chapters from all links on the series page
     const chapters: Plugin.ChapterItem[] = [];
     const seen = new Set<string>();
 
-    $('a[href*="/chapter-"]').each((_, el) => {
+    // Chapters are in an ordered list: ol > li > a
+    // href pattern: /series/<novel-slug>/chapter-<n>-<title>
+    $('ol li a, ul li a').each((_, el) => {
       const href = $(el).attr('href') || '';
-      const chapPath = href.replace(BASE_URL, '');
-      if (!chapPath || seen.has(chapPath)) return;
-      seen.add(chapPath);
+      if (!href.includes('/series/')) return;
+      const path = href.replace(BASE_URL, '');
+      // Must have 3 segments: /series/novel-slug/chapter-slug
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length !== 3) return;
+      if (seen.has(path)) return;
+      seen.add(path);
 
-      const chapName =
+      const name =
         $(el).attr('title') ||
         $(el).text().trim() ||
         `Chapter ${chapters.length + 1}`;
 
       chapters.push({
-        name: chapName,
-        path: chapPath,
+        name: name.replace(/^C\d+\.\s*/, '').trim(), // strip "C1. " prefix if present
+        path,
         chapterNumber: chapters.length + 1,
       });
     });
@@ -119,14 +118,12 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
-    // Remove ads, nav, scripts
     $(
       'script, style, noscript, iframe, nav, header, footer, ' +
       '.chapter-nav, [class*="navigation"], [class*="pager"], ' +
       '[class*="ads"], [id*="ads"], [class*="ad-"], [id*="ad-"]',
     ).remove();
 
-    // Try content selectors in order of specificity
     const selectors = [
       '.chapter-content',
       '.entry-content',
@@ -160,14 +157,12 @@ class NoBadNovel implements Plugin.PluginBase {
     $('a[href*="/series/"]').each((_, el) => {
       const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
-      if (!path || path.split('/').filter(Boolean).length !== 2) return;
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length !== 2) return;
       if (seen.has(path)) return;
       seen.add(path);
 
-      const name =
-        $(el).attr('title') ||
-        $(el).text().trim() ||
-        path;
+      const name = $(el).attr('title') || $(el).text().trim();
       const imgEl = $(el).find('img').first();
       const cover = imgEl.attr('src') || imgEl.attr('data-src') || '';
 
