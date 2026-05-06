@@ -10,7 +10,7 @@ class NoBadNovel implements Plugin.PluginBase {
   name = 'NoBadNovel';
   icon = 'https://www.nobadnovel.com/nobad.svg';
   site = BASE_URL;
-  version = '1.0.2';
+  version = '1.0.3';
 
   async popularNovels(
     pageNo: number,
@@ -25,24 +25,26 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
-    const seen = new Set<string>();
 
-    $('a[href*="/series/"]').each((_, el) => {
+    // Structure: cover <a> (contains img + "Ongoing" text), then <h4><a>Title</a></h4>
+    // Target h4 > a to get clean title and path
+    $('h4 a[href*="/series/"]').each((_, el) => {
       const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
       const segments = path.split('/').filter(Boolean);
       if (segments.length !== 2) return;
-      if (seen.has(path)) return;
-      seen.add(path);
 
-      const name =
-        $(el).attr('title') ||
-        $(el).find('h2, h3, .entry-title').first().text().trim() ||
-        $(el).text().trim();
-      const imgEl = $(el).find('img').first();
-      const cover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+      const name = $(el).text().trim();
+      if (!name) return;
 
-      if (name) novels.push({ name, cover, path });
+      // Cover img is in the sibling/preceding <a> that wraps the image
+      const card = $(el).closest('div, li, article');
+      const cover =
+        card.find('img').first().attr('src') ||
+        card.find('img').first().attr('data-src') ||
+        '';
+
+      novels.push({ name, cover, path });
     });
 
     return novels;
@@ -114,21 +116,15 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
-    // Remove all non-content elements first
     $(
       'script, style, noscript, iframe, nav, header, footer, ' +
       '.chapter-nav, [class*="navigation"], [class*="pager"], ' +
       '[class*="ads"], [id*="ads"], [class*="ad-"], [id*="ad-"]',
     ).remove();
 
-    // The site wraps chapter text in <p> tags directly inside the main content.
-    // Collect all <p> tags that contain meaningful text, skipping nav/meta paragraphs.
-    // We look for the largest contiguous block of <p> tags on the page.
     const paragraphs: string[] = [];
-
     $('p').each((_, el) => {
       const text = $(el).text().trim();
-      // Skip short/empty paragraphs (nav labels, breadcrumbs, etc.)
       if (text.length < 2) return;
       paragraphs.push(`<p>${$(el).html()}</p>`);
     });
@@ -137,7 +133,6 @@ class NoBadNovel implements Plugin.PluginBase {
       return paragraphs.join('\n');
     }
 
-    // Fallback: return whatever main/article contains
     return $('main, article, #content, .content').first().html() || '';
   }
 
@@ -150,21 +145,23 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
-    const seen = new Set<string>();
 
-    $('a[href*="/series/"]').each((_, el) => {
+    $('h4 a[href*="/series/"]').each((_, el) => {
       const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
       const segments = path.split('/').filter(Boolean);
       if (segments.length !== 2) return;
-      if (seen.has(path)) return;
-      seen.add(path);
 
-      const name = $(el).attr('title') || $(el).text().trim();
-      const imgEl = $(el).find('img').first();
-      const cover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+      const name = $(el).text().trim();
+      if (!name) return;
 
-      if (name) novels.push({ name, cover, path });
+      const card = $(el).closest('div, li, article');
+      const cover =
+        card.find('img').first().attr('src') ||
+        card.find('img').first().attr('data-src') ||
+        '';
+
+      novels.push({ name, cover, path });
     });
 
     return novels;
