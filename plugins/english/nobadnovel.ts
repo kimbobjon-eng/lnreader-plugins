@@ -10,7 +10,7 @@ class NoBadNovel implements Plugin.PluginBase {
   name = 'NoBadNovel';
   icon = 'https://www.nobadnovel.com/nobad.svg';
   site = BASE_URL;
-  version = '1.0.3';
+  version = '1.0.4';
 
   async popularNovels(
     pageNo: number,
@@ -26,8 +26,6 @@ class NoBadNovel implements Plugin.PluginBase {
     const $ = parseHTML(body);
     const novels: Plugin.NovelItem[] = [];
 
-    // Structure: cover <a> (contains img + "Ongoing" text), then <h4><a>Title</a></h4>
-    // Target h4 > a to get clean title and path
     $('h4 a[href*="/series/"]').each((_, el) => {
       const href = $(el).attr('href') || '';
       const path = href.replace(BASE_URL, '');
@@ -37,7 +35,6 @@ class NoBadNovel implements Plugin.PluginBase {
       const name = $(el).text().trim();
       if (!name) return;
 
-      // Cover img is in the sibling/preceding <a> that wraps the image
       const card = $(el).closest('div, li, article');
       const cover =
         card.find('img').first().attr('src') ||
@@ -116,24 +113,65 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
-    $(
-      'script, style, noscript, iframe, nav, header, footer, ' +
-      '.chapter-nav, [class*="navigation"], [class*="pager"], ' +
-      '[class*="ads"], [id*="ads"], [class*="ad-"], [id*="ad-"]',
-    ).remove();
+    // The page structure is:
+    //   h1 (chapter title)
+    //   <p>...</p>  × N  ← actual chapter content
+    //   "Previous Chapter / Next Chapter" links
+    //   ## Recommend Series  ← everything after this is junk
+    //
+    // Strategy: find the h1, then collect only sibling <p> elements
+    // that come BEFORE the nav links / recommend section.
 
+    // Remove script/style/ads globally first
+    $('script, style, noscript, iframe, [class*="ads"], [id*="ads"], [class*="ad-"]').remove();
+
+    const chapterH1 = $('h1').first();
+
+    // Collect all <p> elements that are siblings/descendants after the h1
+    // and stop when we hit the chapter nav (prev/next) or h2 (Recommend Series)
     const paragraphs: string[] = [];
-    $('p').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length < 2) return;
-      paragraphs.push(`<p>${$(el).html()}</p>`);
+    let collecting = false;
+
+    // Walk every element in document order
+    $('*').each((_, el) => {
+      const tag = (el as any).tagName?.toLowerCase();
+
+      // Start collecting after the h1
+      if (!collecting) {
+        if (tag === 'h1') collecting = true;
+        return;
+      }
+
+      // Stop at the "Recommend Series" h2 or any heading after content starts
+      if (tag === 'h2' || tag === 'h3') {
+        collecting = false;
+        return;
+      }
+
+      // Stop at prev/next chapter nav links
+      if (tag === 'a') {
+        const href = $(el).attr('href') || '';
+        const text = $(el).text().trim().toLowerCase();
+        if (
+          text.includes('previous chapter') ||
+          text.includes('next chapter') ||
+          text.includes('prev chapter')
+        ) {
+          collecting = false;
+          return;
+        }
+      }
+
+      // Collect <p> tags
+      if (tag === 'p') {
+        const text = $(el).text().trim();
+        if (text.length >= 2) {
+          paragraphs.push(`<p>${$(el).html()}</p>`);
+        }
+      }
     });
 
-    if (paragraphs.length > 0) {
-      return paragraphs.join('\n');
-    }
-
-    return $('main, article, #content, .content').first().html() || '';
+    return paragraphs.join('\n');
   }
 
   async searchNovels(
