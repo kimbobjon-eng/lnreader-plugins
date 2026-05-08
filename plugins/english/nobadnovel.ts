@@ -10,7 +10,7 @@ class NoBadNovel implements Plugin.PluginBase {
   name = 'NoBadNovel';
   icon = 'https://www.nobadnovel.com/nobad.svg';
   site = BASE_URL;
-  version = '1.0.4';
+  version = '1.0.5';
 
   async popularNovels(
     pageNo: number,
@@ -91,15 +91,22 @@ class NoBadNovel implements Plugin.PluginBase {
       if (seen.has(path)) return;
       seen.add(path);
 
-      const name =
+      const chapterNumber = chapters.length + 1;
+
+      // Strip existing C1. prefix from site, then prepend clean "Chapter N: Title"
+      const rawName =
         $(el).attr('title') ||
         $(el).text().trim() ||
-        `Chapter ${chapters.length + 1}`;
+        '';
+      const cleanName = rawName.replace(/^C\d+\.\s*/, '').trim();
+      const name = cleanName
+        ? `Chapter ${chapterNumber}: ${cleanName}`
+        : `Chapter ${chapterNumber}`;
 
       chapters.push({
-        name: name.replace(/^C\d+\.\s*/, '').trim(),
+        name,
         path,
-        chapterNumber: chapters.length + 1,
+        chapterNumber,
       });
     });
 
@@ -113,44 +120,25 @@ class NoBadNovel implements Plugin.PluginBase {
     const body = await result.text();
     const $ = parseHTML(body);
 
-    // The page structure is:
-    //   h1 (chapter title)
-    //   <p>...</p>  × N  ← actual chapter content
-    //   "Previous Chapter / Next Chapter" links
-    //   ## Recommend Series  ← everything after this is junk
-    //
-    // Strategy: find the h1, then collect only sibling <p> elements
-    // that come BEFORE the nav links / recommend section.
-
-    // Remove script/style/ads globally first
     $('script, style, noscript, iframe, [class*="ads"], [id*="ads"], [class*="ad-"]').remove();
 
-    const chapterH1 = $('h1').first();
-
-    // Collect all <p> elements that are siblings/descendants after the h1
-    // and stop when we hit the chapter nav (prev/next) or h2 (Recommend Series)
     const paragraphs: string[] = [];
     let collecting = false;
 
-    // Walk every element in document order
     $('*').each((_, el) => {
       const tag = (el as any).tagName?.toLowerCase();
 
-      // Start collecting after the h1
       if (!collecting) {
         if (tag === 'h1') collecting = true;
         return;
       }
 
-      // Stop at the "Recommend Series" h2 or any heading after content starts
       if (tag === 'h2' || tag === 'h3') {
         collecting = false;
         return;
       }
 
-      // Stop at prev/next chapter nav links
       if (tag === 'a') {
-        const href = $(el).attr('href') || '';
         const text = $(el).text().trim().toLowerCase();
         if (
           text.includes('previous chapter') ||
@@ -162,7 +150,6 @@ class NoBadNovel implements Plugin.PluginBase {
         }
       }
 
-      // Collect <p> tags
       if (tag === 'p') {
         const text = $(el).text().trim();
         if (text.length >= 2) {
